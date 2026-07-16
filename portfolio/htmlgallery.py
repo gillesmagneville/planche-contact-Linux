@@ -36,18 +36,13 @@ class HTMLGalleryGenerator:
                 try:
                     img = Image.open(image_path)
                     if self.watermark_text:
-                        img = apply_watermark(
-                            img,
-                            self.watermark_text,
-                            self.watermark_opacity,
-                            self.watermark_orientation
-                        )
+                        img = apply_watermark(img, self.watermark_text, self.watermark_opacity, self.watermark_orientation)
                     img.save(images_dir / Path(image_path).name, quality=90)
                 except Exception as e:
                     print(f"Erreur sur {image_path}: {e}")
                     shutil.copy2(image_path, images_dir / Path(image_path).name)
 
-        # Miniatures + filigrane
+        # Génération des vignettes (multiprocessing)
         thumb_size = 400
         thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
 
@@ -76,7 +71,6 @@ class HTMLGalleryGenerator:
                        current_page, total_pages, total_images, thumbs_dir):
         thumbs_dir.mkdir(exist_ok=True)
 
-        # En-tête avec titre + auteur
         header_html = f"<h1>{display_title}</h1>"
         if folder_name:
             header_html += f"<p>{folder_name}</p>"
@@ -100,7 +94,6 @@ class HTMLGalleryGenerator:
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{display_title}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }}
@@ -130,14 +123,9 @@ class HTMLGalleryGenerator:
             thumb_filename = f"thumb_p{current_page}_{idx:04d}.jpg"
             thumb_path = thumbs_dir / thumb_filename
 
-            # Application du filigrane centré sur la miniature
+            # Application du filigrane uniquement au moment de la sauvegarde (plus efficace)
             if self.watermark_text and thumb:
-                thumb = apply_watermark(
-                    thumb,
-                    self.watermark_text,
-                    self.watermark_opacity,
-                    self.watermark_orientation
-                )
+                thumb = apply_watermark(thumb, self.watermark_text, self.watermark_opacity, self.watermark_orientation)
 
             thumb.save(thumb_path, "JPEG", quality=85)
 
