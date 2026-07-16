@@ -17,7 +17,7 @@ class HTMLGalleryGenerator:
         self.watermark_orientation = getattr(config, 'watermark_orientation', 'Horizontal')
 
     def _apply_light_watermark(self, image: Image.Image, text: str):
-        """Filigrane léger et centré (rapide) pour la galerie"""
+        """Filigrane léger, gris neutre, positionné au tiers inférieur"""
         if not text or image is None:
             return image
 
@@ -38,10 +38,11 @@ class HTMLGalleryGenerator:
             bbox = draw.textbbox((0, 0), text, font=font)
             text_width = bbox[2] - bbox[0]
             x = (image.width - text_width) // 2
-            y = image.height - bbox[3] - 8
+            y = int(image.height * 0.72)   # ← Tiers inférieur
 
             alpha = int(255 * (self.watermark_opacity / 100))
-            draw.text((x, y), text, font=font, fill=(255, 255, 255, alpha))
+            # Gris neutre
+            draw.text((x, y), text, font=font, fill=(180, 180, 180, alpha))
 
             return image.convert('RGB')
         except Exception as e:
@@ -133,7 +134,13 @@ class HTMLGalleryGenerator:
         .nav {{ text-align: center; margin: 15px 0; }}
         .nav a {{ margin: 0 12px; text-decoration: none; color: #0066cc; font-size: 1.1em; }}
         .gallery {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; max-width: 1400px; margin: 0 auto; }}
-        .gallery img {{ width: 100%; height: 200px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: transform 0.2s; }}
+        .gallery img {{
+            width: 100%;
+            height: auto;                 /* ← conserve le format d'origine */
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            transition: transform 0.2s;
+        }}
         .gallery img:hover {{ transform: scale(1.03); }}
         .footer {{ text-align: center; margin-top: 30px; color: #666; }}
     </style>
@@ -154,7 +161,7 @@ class HTMLGalleryGenerator:
             thumb_filename = f"thumb_p{current_page}_{idx:04d}.jpg"
             thumb_path = thumbs_dir / thumb_filename
 
-            # Filigrane léger sur les vignettes
+            # Filigrane léger gris neutre au tiers inférieur
             if self.watermark_text and thumb:
                 if thumb.mode != 'RGBA':
                     thumb = thumb.convert('RGBA')
@@ -171,10 +178,10 @@ class HTMLGalleryGenerator:
                 bbox = draw.textbbox((0, 0), self.watermark_text, font=font)
                 text_width = bbox[2] - bbox[0]
                 x = (thumb.width - text_width) // 2
-                y = thumb.height - bbox[3] - 5
+                y = int(thumb.height * 0.72)   # Tiers inférieur
 
                 alpha = int(255 * (self.watermark_opacity / 100))
-                draw.text((x, y), self.watermark_text, font=font, fill=(255, 255, 255, alpha))
+                draw.text((x, y), self.watermark_text, font=font, fill=(180, 180, 180, alpha))
                 thumb = thumb.convert('RGB')
 
             thumb.save(thumb_path, "JPEG", quality=85)
