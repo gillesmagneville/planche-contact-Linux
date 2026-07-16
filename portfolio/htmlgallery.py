@@ -1,8 +1,8 @@
 from pathlib import Path
 import shutil
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
-from portfolio.utils import apply_watermark
+from portfolio.utils import apply_watermark   # On garde la version riche pour les images plein format si besoin
 
 
 class HTMLGalleryGenerator:
@@ -15,7 +15,7 @@ class HTMLGalleryGenerator:
         self.images_per_page = getattr(config, 'html_images_per_page', 48)
 
         self.watermark_text = getattr(config, 'watermark_text', None)
-        self.watermark_opacity = getattr(config, 'watermark_opacity', 45)
+        self.watermark_opacity = getattr(config, 'watermark_opacity', 50)
         self.watermark_orientation = getattr(config, 'watermark_orientation', 'Horizontal')
 
     def create_gallery(self, images, output_dir: Path):
@@ -29,20 +29,25 @@ class HTMLGalleryGenerator:
         folder_name = Path(self.input_dir).name if self.input_dir else ""
         total_pages = (len(images) + self.images_per_page - 1) // self.images_per_page
 
-        # Images originales + filigrane
+        # === Images plein format + filigrane (version riche) ===
         for item in images:
             image_path = item.get('path') if isinstance(item, dict) else item
             if image_path and Path(image_path).exists():
                 try:
                     img = Image.open(image_path)
                     if self.watermark_text:
-                        img = apply_watermark(img, self.watermark_text, self.watermark_opacity, self.watermark_orientation)
+                        img = apply_watermark(
+                            img,
+                            self.watermark_text,
+                            self.watermark_opacity,
+                            self.watermark_orientation
+                        )
                     img.save(images_dir / Path(image_path).name, quality=90)
                 except Exception as e:
                     print(f"Erreur sur {image_path}: {e}")
                     shutil.copy2(image_path, images_dir / Path(image_path).name)
 
-        # Génération des vignettes (multiprocessing)
+        # === Génération des vignettes ===
         thumb_size = 400
         thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
 
@@ -71,6 +76,7 @@ class HTMLGalleryGenerator:
                        current_page, total_pages, total_images, thumbs_dir):
         thumbs_dir.mkdir(exist_ok=True)
 
+        # En-tête
         header_html = f"<h1>{display_title}</h1>"
         if folder_name:
             header_html += f"<p>{folder_name}</p>"
@@ -94,6 +100,7 @@ class HTMLGalleryGenerator:
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{display_title}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }}
@@ -123,9 +130,29 @@ class HTMLGalleryGenerator:
             thumb_filename = f"thumb_p{current_page}_{idx:04d}.jpg"
             thumb_path = thumbs_dir / thumb_filename
 
-            # Application du filigrane uniquement au moment de la sauvegarde (plus efficace)
+            # === Filigrane léger et centré sur les vignettes (rapide) ===
             if self.watermark_text and thumb:
-                thumb = apply_watermark(thumb, self.watermark_text, self.watermark_opacity, self.watermark_orientation)
+                if thumb.mode != 'RGBA':
+                    thumb = thumb.convert('RGBA')
+
+                draw = ImageDraw.Draw(thumb)
+                font_size = max(10, thumb.width // 16)
+
+                try:
+                    font = ImageFont.truetype(
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
+                    )
+                except:
+                    font = ImageFont.load_default()
+
+                bbox = draw.textbbox((0, 0), self.watermark_text, font=font)
+                text_width = bbox[2] - bbox[0]
+                x = (thumb.width - text_width) // 2
+                y = thumb.height - bbox[3] - 5
+
+                alpha = int(255 * (self.watermark_opacity / 100))
+                draw.text((x, y), self.watermark_text, font=font, fill=(255, 255, 255, alpha))
+                thumb = thumb.convert('RGB')
 
             thumb.save(thumb_path, "JPEG", quality=85)
 
