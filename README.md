@@ -1,5 +1,6 @@
 ```markdown
-# Planche-Contact
+# Planche Contact – Linux Edition
+Générateur de planches contact haute qualité pour photographes, développé en Python et GTK 4.
 
 **Planche-Contact** est un outil léger, rapide et sans base de données permettant de générer des **planches contact photographiques** de haute qualité (300 dpi) à partir d’un dossier d’images.
 
