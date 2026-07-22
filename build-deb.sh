@@ -147,9 +147,14 @@ fi
 
 # === À partir d'ici, la construction est confirmée ===
 
-# Suppression des anciens .deb (seulement maintenant)
 echo ">>> Suppression des paquets .deb existants..."
 rm -f ./*.deb
+
+# Écriture de la nouvelle version AVANT de construire le paquet
+if [ "$NO_VERSION_CHANGE" = false ]; then
+    echo "$NEW_VERSION" > "$VERSION_FILE"
+    echo ">>> Version mise à jour : $NEW_VERSION"
+fi
 
 DEB_FILE="./${PACKAGE_NAME}_${NEW_VERSION}_amd64.deb"
 
@@ -181,7 +186,7 @@ echo ">>> Copie des fichiers du projet..."
 cp "$PROJECT_DIR/planche-contact-gtk.py" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 cp -r "$PROJECT_DIR/portfolio" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 
-# Copie du fichier VERSION (nécessaire pour l'onglet À propos)
+# Copie du fichier VERSION (maintenant à jour)
 [ -f "$PROJECT_DIR/VERSION" ] && cp "$PROJECT_DIR/VERSION" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 
 mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs"
@@ -236,11 +241,6 @@ fpm -s dir -t deb \
     --depends libgtk-4-1 \
     -C "$BUILD_DIR" \
     usr/ DEBIAN/
-
-# Mise à jour du fichier VERSION uniquement si la version a changé
-if [ "$NO_VERSION_CHANGE" = false ]; then
-    echo "$NEW_VERSION" > "$VERSION_FILE"
-fi
 
 echo ""
 echo "✅ Paquet créé avec succès :"
