@@ -13,36 +13,40 @@ VERSION_FILE="$PROJECT_DIR/VERSION"
 
 show_help() {
     cat << EOF
-Usage: ./build-deb.sh [version] [options]
+Usage: ./build-deb.sh [options]
 
 Script de construction du paquet Debian pour Planche Contact.
 
 OPTIONS :
-  [version]       Force une version spécifique (ex: 1.0.3 ou 1.1.0)
-                  Si aucune version n'est fournie, utilise celle du fichier VERSION.
+  --major               Incrémente le numéro majeur   (ex: 1.2.3 → 2.0.0)
+  --minor               Incrémente le numéro mineur   (ex: 1.2.3 → 1.3.0)
+  --patch               Incrémente le numéro de patch (ex: 1.2.3 → 1.2.4)
+  --no-version-change   Reconstruit le paquet sans changer la version
+  --clean               Nettoie le dossier de build et supprime tous les .deb
+  --help, -h            Affiche cette aide
 
-  --clean         Nettoie le dossier de build et supprime tous les paquets .deb
-                  existants dans le répertoire courant.
-
-  --help, -h      Affiche cette aide.
-
-EXEMPLES :
-  ./build-deb.sh                  # Construit avec la version du fichier VERSION
-  ./build-deb.sh 1.0.3            # Force la construction en version 1.0.3
-  ./build-deb.sh --clean          # Nettoie le build et supprime les .deb
-  ./build-deb.sh 1.1.0 --clean    # (non recommandé) Nettoie puis construit
+Sans argument → mode interactif (demande major / minor / patch / no-version-change)
 
 EOF
 }
 
+INCREMENT=""
+NO_VERSION_CHANGE=false
 CLEAN=false
-NEW_VERSION=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --clean) CLEAN=true; shift ;;
-        --help|-h) show_help; exit 0 ;;
-        *) NEW_VERSION="$1"; shift ;;
+        --major)              INCREMENT="major"; shift ;;
+        --minor)              INCREMENT="minor"; shift ;;
+        --patch)              INCREMENT="patch"; shift ;;
+        --no-version-change)  NO_VERSION_CHANGE=true; shift ;;
+        --clean)              CLEAN=true; shift ;;
+        --help|-h)            show_help; exit 0 ;;
+        *)
+            echo "Option inconnue : $1"
+            show_help
+            exit 1
+            ;;
     esac
 done
 
@@ -50,10 +54,8 @@ done
 if [ "$CLEAN" = true ]; then
     echo ">>> Nettoyage du dossier de build..."
     rm -rf "$BUILD_DIR"
-
     echo ">>> Suppression des paquets .deb existants..."
     rm -f ./*.deb
-
     echo ">>> Nettoyage terminé."
     exit 0
 fi
@@ -65,28 +67,96 @@ if ! command -v fpm &> /dev/null; then
     exit 1
 fi
 
-# Détermination de la version
+# === Lecture de la version actuelle ===
 if [ -f "$VERSION_FILE" ]; then
-    VERSION=$(cat "$VERSION_FILE")
+    CURRENT_VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
 else
-    VERSION="1.0.0"
+    CURRENT_VERSION="1.0.0"
 fi
 
-if [ -n "$NEW_VERSION" ]; then
-    VERSION="$NEW_VERSION"
+# Découpage de la version
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+MAJOR=${MAJOR:-0}
+MINOR=${MINOR:-0}
+PATCH=${PATCH:-0}
+
+# === Mode interactif si aucun argument ===
+if [ -z "$INCREMENT" ] && [ "$NO_VERSION_CHANGE" = false ]; then
+    echo ""
+    echo "Version actuelle : $CURRENT_VERSION"
+    echo ""
+    echo "Que souhaitez-vous faire ?"
+    echo "  1) major              (→ $((MAJOR+1)).0.0)"
+    echo "  2) minor              (→ $MAJOR.$((MINOR+1)).0)"
+    echo "  3) patch              (→ $MAJOR.$MINOR.$((PATCH+1)))"
+    echo "  4) no-version-change  (reconstruire en $CURRENT_VERSION)"
+    echo ""
+    read -p "Votre choix [1/2/3/4] : " CHOICE
+
+    case $CHOICE in
+        1) INCREMENT="major" ;;
+        2) INCREMENT="minor" ;;
+        3) INCREMENT="patch" ;;
+        4) NO_VERSION_CHANGE=true ;;
+        *)
+            echo "Choix invalide. Annulation."
+            exit 1
+            ;;
+    esac
 fi
 
-DEB_FILE="./${PACKAGE_NAME}_${VERSION}_amd64.deb"
+# === Calcul de la nouvelle version ===
+if [ "$NO_VERSION_CHANGE" = true ]; then
+    NEW_VERSION="$CURRENT_VERSION"
+else
+    case $INCREMENT in
+        major)
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            ;;
+        minor)
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            ;;
+        patch)
+            PATCH=$((PATCH + 1))
+            ;;
+    esac
+    NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+fi
 
+# === Demande de confirmation ===
+echo ""
 echo "========================================"
-echo " Construction du paquet $PACKAGE_NAME v$VERSION"
-echo "========================================"
-
-# Supprime l'ancien paquet avant reconstruction
-if [ -f "$DEB_FILE" ]; then
-    echo ">>> Suppression de l'ancien paquet..."
-    rm -f "$DEB_FILE"
+if [ "$NO_VERSION_CHANGE" = true ]; then
+    echo "  Mode           : Reconstruction sans changement de version"
+    echo "  Version        : $NEW_VERSION"
+else
+    echo "  Version actuelle : $CURRENT_VERSION"
+    echo "  Nouvelle version : $NEW_VERSION"
 fi
+echo "========================================"
+echo ""
+read -p "Construire le paquet en version $NEW_VERSION ? [o/N] " CONFIRM
+
+if [[ ! "$CONFIRM" =~ ^[oOyY]$ ]]; then
+    echo "Construction annulée. Aucun fichier n'a été modifié."
+    exit 0
+fi
+
+# === À partir d'ici, la construction est confirmée ===
+
+# Suppression des anciens .deb (seulement maintenant)
+echo ">>> Suppression des paquets .deb existants..."
+rm -f ./*.deb
+
+DEB_FILE="./${PACKAGE_NAME}_${NEW_VERSION}_amd64.deb"
+
+echo ""
+echo "========================================"
+echo " Construction du paquet $PACKAGE_NAME v$NEW_VERSION"
+echo "========================================"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
@@ -152,7 +222,7 @@ chmod 755 "$BUILD_DIR/DEBIAN/postinst" "$BUILD_DIR/DEBIAN/postrm"
 echo ">>> Création du paquet .deb..."
 fpm -s dir -t deb \
     -n "$PACKAGE_NAME" \
-    -v "$VERSION" \
+    -v "$NEW_VERSION" \
     --license "GPL-3.0" \
     --maintainer "$MAINTAINER" \
     --description "$DESCRIPTION" \
@@ -164,8 +234,16 @@ fpm -s dir -t deb \
     -C "$BUILD_DIR" \
     usr/ DEBIAN/
 
-echo "$VERSION" > "$VERSION_FILE"
+# Mise à jour du fichier VERSION uniquement si la version a changé
+if [ "$NO_VERSION_CHANGE" = false ]; then
+    echo "$NEW_VERSION" > "$VERSION_FILE"
+fi
 
 echo ""
 echo "✅ Paquet créé avec succès :"
 echo "   $DEB_FILE"
+if [ "$NO_VERSION_CHANGE" = true ]; then
+    echo "   Version inchangée : $NEW_VERSION"
+else
+    echo "   Version enregistrée : $NEW_VERSION"
+fi

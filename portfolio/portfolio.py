@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 portfolio.py - Générateur de planches-contact
-(Version avec progression correcte + flush)
 """
 
 import sys
 import time
 import logging
+import shutil
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -92,8 +92,16 @@ def main():
     thumb_gen = ThumbnailGenerator(config)
     cs_gen = ContactSheetGenerator(config, thumb_gen)
 
+    # === Nettoyage avant génération ===
     planches_dir = output_dir / "planches"
+    if planches_dir.exists():
+        shutil.rmtree(planches_dir)
     planches_dir.mkdir(exist_ok=True)
+
+    pdf_path = output_dir / "portfolio.pdf"
+    if pdf_path.exists():
+        pdf_path.unlink()
+
     planche_files = []
 
     # Phase 2: Contact sheets
@@ -114,7 +122,6 @@ def main():
         except Exception as e:
             logger.error(f"Erreur planche {page_num}: {e}")
 
-    # On force le flush avant de commencer le PDF
     sys.stdout.flush()
 
     # Phase 3: PDF

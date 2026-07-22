@@ -109,13 +109,21 @@ class ContactSheetGenerator:
     def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages):
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 26)
+            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
         except:
-            font = ImageFont.load_default()
+            font = font_small = ImageFont.load_default()
 
+        # Numéro de planche
         page_text = f"Planche {page_num}/{total_pages}"
         bbox = draw.textbbox((0, 0), page_text, font=font)
         page_w = bbox[2] - bbox[0]
-        draw.text(((canvas_w - page_w) / 2, canvas_h - 60), page_text, fill="black", font=font)
+        draw.text(((canvas_w - page_w) / 2, canvas_h - 90), page_text, fill="black", font=font)
+
+        # Footer
+        credit = "Planche générée par Planche-Contact"
+        bbox = draw.textbbox((0, 0), credit, font=font_small)
+        credit_w = bbox[2] - bbox[0]
+        draw.text(((canvas_w - credit_w) / 2, canvas_h - 50), credit, fill="#555555", font=font_small)
 
     def _apply_watermark(self, image, text, opacity=70, orientation="Horizontal"):
         """
@@ -136,9 +144,9 @@ class ContactSheetGenerator:
         text_color = (255, 255, 255, opacity)
 
         if orientation == "Diagonale horaire":
-            angle = 32
-        elif orientation == "Diagonale anti-horaire":
             angle = -32
+        elif orientation == "Diagonale anti-horaire":
+            angle = 32
         else:
             angle = 0
 
@@ -146,7 +154,6 @@ class ContactSheetGenerator:
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
-        # === ESPACEMENT AUGMENTÉ pour moins de répétitions ===
         x_spacing = text_width + 220
         y_spacing = text_height + 160
 

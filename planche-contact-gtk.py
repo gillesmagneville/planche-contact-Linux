@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Planche-Contact GTK - Interface Graphique
-(Version avec jauge de progression complète sur toutes les étapes)
 """
 import gi
 gi.require_version('Gtk', '4.0')
@@ -123,10 +122,10 @@ class PlancheContactGTK(Gtk.Application):
 
         grid.attach(Gtk.Label(label="Images par planche :"), 0, 1, 1, 1)
         num_model = Gtk.StringList()
-        for n in [9, 12, 16, 20, 25]:
+        for n in range(8, 49, 4):          # 8 → 48 par pas de 4
             num_model.append(str(n))
         self.num_combo = Gtk.DropDown(model=num_model)
-        self.num_combo.set_selected(1)
+        self.num_combo.set_selected(1)     # 12 par défaut
         grid.attach(self.num_combo, 1, 1, 1, 1)
 
         grid.attach(Gtk.Label(label="Format de la planche :"), 0, 2, 1, 1)
@@ -322,12 +321,11 @@ class PlancheContactGTK(Gtk.Application):
                         GLib.idle_add(self.progress.set_fraction, fraction)
                         continue
 
-                    # 2. Fallback pour les lignes "Planche X/Y" (ne monte pas trop haut)
+                    # 2. Fallback pour les lignes "Planche X/Y"
                     match = re.search(r"Planche (\d+)/(\d+)", line)
                     if match:
                         current = int(match.group(1))
                         total = int(match.group(2))
-                        # On limite à ~70 % maximum pour laisser de la place aux étapes PDF/CSV/HTML
                         fraction = min(0.70, 0.15 + (current / total) * 0.55)
                         GLib.idle_add(self.progress.set_fraction, fraction)
 
