@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-portfolio.py - Générateur de planches-contact
+portfolio.py - Générateur de planches-contact (version avec progression complète)
 """
 
 import sys
@@ -74,11 +74,15 @@ def main():
         watermark_orientation=args.watermark_orientation,
     )
 
+    # Phase 1: Scan
+    print("PROGRESS:0/100 Scan des images...")
     scanner = ImageScanner(config)
     images = scanner.scan()
+    print(f"PROGRESS:10/100 {len(images)} images trouvées.")
 
     if not images:
         logger.warning("Aucune image trouvée.")
+        print("PROGRESS:100/100 Terminé (aucune image).")
         return
 
     n = config.num_per_sheet
@@ -91,6 +95,8 @@ def main():
     planches_dir.mkdir(exist_ok=True)
     planche_files = []
 
+    # Phase 2: Contact sheets
+    print("PROGRESS:15/100 Génération des planches contact...")
     for page_idx in range(total_pages):
         batch = images[page_idx * n : (page_idx + 1) * n]
         page_num = page_idx + 1
@@ -101,20 +107,32 @@ def main():
                 p = planches_dir / f"planche_{page_num:03d}.jpg"
                 sheet.save(p, "JPEG", quality=95)
                 planche_files.append(p)
-                logger.info(f"Planche {page_num}/{total_pages} générée")
+                progress = 15 + int(55 * (page_num / total_pages))
+                print(f"Planche {page_num}/{total_pages} générée")
+                print(f"PROGRESS:{progress}/100")
         except Exception as e:
             logger.error(f"Erreur planche {page_num}: {e}")
 
+    # Phase 3: PDF
     if config.generate_pdf and planche_files:
+        print("PROGRESS:75/100 Génération du PDF...")
         PDFExporter().create_pdf(planche_files, output_dir / "portfolio.pdf")
+        print("PROGRESS:80/100 PDF terminé.")
 
+    # Phase 4: CSV
     if config.generate_csv:
+        print("PROGRESS:82/100 Génération de l'index CSV...")
         CSVIndexGenerator().create(images, output_dir / "index.csv")
+        print("PROGRESS:85/100 CSV terminé.")
 
+    # Phase 5: HTML Gallery (étape souvent longue)
     if config.generate_html:
+        print("PROGRESS:86/100 Génération de la galerie HTML...")
         gdir = output_dir / "gallery"
         HTMLGalleryGenerator(config, thumb_gen).create_gallery(images, gdir)
+        print("PROGRESS:98/100 Galerie HTML terminée.")
 
+    print("PROGRESS:100/100 Terminé avec succès !")
     logger.info(f"Terminé en {time.time() - start:.1f} secondes")
 
 

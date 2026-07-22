@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """
 Planche-Contact GTK - Interface Graphique
+(Version avec jauge de progression complète sur toutes les étapes)
 """
 import gi
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, GLib, Gio, GdkPixbuf
+from gi.repository import Gtk, GLib, Gio
 
 import sys
 import subprocess
 import threading
 import json
 import re
-import cairo
 import webbrowser
 import tempfile
 from pathlib import Path
-from PIL import Image as PILImage
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -26,7 +25,6 @@ class PlancheContactGTK(Gtk.Application):
     def __init__(self):
         super().__init__(application_id="com.planchecontact.gtk")
         self.win = None
-        self.cairo_surface = None
         self.settings_path = Path.home() / ".config" / "planche-contact" / "settings.json"
         self.last_input_dir = ""
         self.last_output_dir = ""
@@ -222,6 +220,7 @@ class PlancheContactGTK(Gtk.Application):
         self.csv_check.set_active(True)
         self.log_buffer.set_text("")
         self.status_label.set_text("")
+        self.progress.set_fraction(0.0)
 
     def _choose_folder(self, button, entry, folder_type):
         dialog = Gtk.FileChooserDialog(
@@ -315,11 +314,21 @@ class PlancheContactGTK(Gtk.Application):
                 if line:
                     GLib.idle_add(self._log, line)
                     GLib.idle_add(self.status_label.set_text, line)
+
+                    # 1. Priorité aux messages explicites PROGRESS:X/100
+                    progress_match = re.search(r"PROGRESS:(\d+)/100", line)
+                    if progress_match:
+                        fraction = int(progress_match.group(1)) / 100.0
+                        GLib.idle_add(self.progress.set_fraction, fraction)
+                        continue
+
+                    # 2. Fallback pour les lignes "Planche X/Y" (ne monte pas trop haut)
                     match = re.search(r"Planche (\d+)/(\d+)", line)
                     if match:
                         current = int(match.group(1))
                         total = int(match.group(2))
-                        fraction = current / total
+                        # On limite à ~70 % maximum pour laisser de la place aux étapes PDF/CSV/HTML
+                        fraction = min(0.70, 0.15 + (current / total) * 0.55)
                         GLib.idle_add(self.progress.set_fraction, fraction)
 
             process.wait()
@@ -357,7 +366,6 @@ class PlancheContactGTK(Gtk.Application):
                 webbrowser.open(f'file://{f.name}')
 
     def _get_full_manual_html(self):
-        # Version de secours si le fichier docs/ n'existe pas
         return """<!DOCTYPE html>
 <html><body><h1>Planche-Contact</h1>
 <p>Le manuel détaillé se trouve dans <code>docs/planche-contact-manual.html</code>.</p>
@@ -390,7 +398,7 @@ class PlancheContactGTK(Gtk.Application):
         box.set_margin_start(30)
 
         label = Gtk.Label()
-        label.set_markup("<b>Planche-Contact GTK</b>\n\nVersion finale stable.")
+        label.set_markup("<b>Planche-Contact GTK</b>\n\nVersion avec progression complète.")
         box.append(label)
 
         return box
