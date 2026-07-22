@@ -31,7 +31,6 @@ class ContactSheetGenerator:
         spacing = int(5 * 300 / 25.4)
         n = len(images)
 
-        # === Calcul UNE SEULE FOIS (basé sur num_per_sheet) ===
         best_cols = 1
         best_thumb_size = 0
 
@@ -113,24 +112,23 @@ class ContactSheetGenerator:
         except:
             font = font_small = ImageFont.load_default()
 
-        # Numéro de planche
         page_text = f"Planche {page_num}/{total_pages}"
         bbox = draw.textbbox((0, 0), page_text, font=font)
         page_w = bbox[2] - bbox[0]
         draw.text(((canvas_w - page_w) / 2, canvas_h - 90), page_text, fill="black", font=font)
 
-        # Footer
         credit = "Planche générée par Planche-Contact"
         bbox = draw.textbbox((0, 0), credit, font=font_small)
         credit_w = bbox[2] - bbox[0]
         draw.text(((canvas_w - credit_w) / 2, canvas_h - 50), credit, fill="#555555", font=font_small)
 
     def _apply_watermark(self, image, text, opacity=70, orientation="Horizontal"):
-        """
-        Filigrane répété, discret, sans fond.
-        """
         if not text:
             return image
+
+        # Ajout automatique du symbole copyright
+        if not text.startswith("©"):
+            text = "© " + text
 
         img = image.convert("RGBA")
         overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))

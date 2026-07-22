@@ -19,9 +19,12 @@ class HTMLGalleryGenerator:
         self.watermark_orientation = getattr(config, 'watermark_orientation', 'Horizontal')
 
     def _apply_light_watermark(self, image: Image.Image, text: str):
-        """Filigrane léger, gris neutre, positionné au tiers inférieur"""
         if not text or image is None:
             return image
+
+        # Ajout automatique du symbole copyright
+        if not text.startswith("©"):
+            text = "© " + text
 
         try:
             if image.mode != 'RGBA':
@@ -51,7 +54,6 @@ class HTMLGalleryGenerator:
             return image
 
     def _process_full_image(self, item, images_dir: Path):
-        """Worker pour le traitement parallèle des images plein format"""
         image_path = item.get('path') if isinstance(item, dict) else item
         if not image_path or not Path(image_path).exists():
             return
@@ -70,7 +72,6 @@ class HTMLGalleryGenerator:
                 pass
 
     def create_gallery(self, images, output_dir: Path):
-        # === Suppression systématique de l'ancienne galerie ===
         if output_dir.exists():
             shutil.rmtree(output_dir)
 
@@ -83,7 +84,6 @@ class HTMLGalleryGenerator:
         display_title = self.project_title or (Path(self.input_dir).name if self.input_dir else "Galerie Photo")
         total_pages = (len(images) + self.images_per_page - 1) // self.images_per_page
 
-        # === 1. Images plein format en parallèle ===
         max_workers = min(os.cpu_count() or 4, 8)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
@@ -93,12 +93,14 @@ class HTMLGalleryGenerator:
             for future in as_completed(futures):
                 future.result()
 
-        # === 2. Vignettes en parallèle ===
         thumb_size = 400
         thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
 
-        # === 3. Application unique du filigrane sur les vignettes ===
         if self.watermark_text:
+            wm_text = self.watermark_text
+            if not wm_text.startswith("©"):
+                wm_text = "© " + wm_text
+
             for i, thumb in enumerate(thumbnails):
                 if thumb is None:
                     continue
@@ -115,18 +117,17 @@ class HTMLGalleryGenerator:
                     except:
                         font = ImageFont.load_default()
 
-                    bbox = draw.textbbox((0, 0), self.watermark_text, font=font)
+                    bbox = draw.textbbox((0, 0), wm_text, font=font)
                     text_width = bbox[2] - bbox[0]
                     x = (thumb.width - text_width) // 2
                     y = int(thumb.height * 0.72)
 
                     alpha = int(255 * (self.watermark_opacity / 100))
-                    draw.text((x, y), self.watermark_text, font=font, fill=(180, 180, 180, alpha))
+                    draw.text((x, y), wm_text, font=font, fill=(180, 180, 180, alpha))
                     thumbnails[i] = thumb.convert('RGB')
                 except Exception:
                     pass
 
-        # === 4. Génération des pages HTML ===
         for page_num in range(1, total_pages + 1):
             start = (page_num - 1) * self.images_per_page
             page_images = images[start : start + self.images_per_page]
@@ -156,17 +157,14 @@ class HTMLGalleryGenerator:
             header_html += f"<p>Par {self.author}</p>"
         header_html += f"<p>{total_images} images • Page {current_page} / {total_pages}</p>"
 
-        # === Navigation améliorée ===
         nav_html = ""
         if total_pages > 1:
             nav_html = '<div class="nav">'
 
-            # Bouton Précédent
             if current_page > 1:
                 prev = "index.html" if current_page == 2 else f"page_{current_page-1:03d}.html"
                 nav_html += f'<a href="{prev}">← Précédent</a>&nbsp;&nbsp;'
 
-            # Numéros de pages
             if total_pages <= 15:
                 pages = list(range(1, total_pages + 1))
             else:
@@ -190,7 +188,6 @@ class HTMLGalleryGenerator:
                     else:
                         nav_html += f' <a href="{href}">{p}</a> '
 
-            # Bouton Suivant
             if current_page < total_pages:
                 nextp = f"page_{current_page+1:03d}.html"
                 nav_html += f'&nbsp;&nbsp;<a href="{nextp}">Suivant →</a>'

@@ -75,7 +75,6 @@ class PlancheContactGTK(Gtk.Application):
         hbox = Gtk.Box(spacing=10)
         hbox.append(Gtk.Label(label="Titre du projet :"))
         self.project_title_entry = Gtk.Entry()
-        self.project_title_entry.set_placeholder_text("Mon projet photo")
         self.project_title_entry.set_hexpand(True)
         hbox.append(self.project_title_entry)
         box.append(hbox)
@@ -84,7 +83,6 @@ class PlancheContactGTK(Gtk.Application):
         hbox = Gtk.Box(spacing=10)
         hbox.append(Gtk.Label(label="Nom de l'auteur :"))
         self.author_entry = Gtk.Entry()
-        self.author_entry.set_placeholder_text("Abel GEZ")
         self.author_entry.set_hexpand(True)
         hbox.append(self.author_entry)
         box.append(hbox)
@@ -122,10 +120,10 @@ class PlancheContactGTK(Gtk.Application):
 
         grid.attach(Gtk.Label(label="Images par planche :"), 0, 1, 1, 1)
         num_model = Gtk.StringList()
-        for n in range(8, 49, 4):          # 8 → 48 par pas de 4
+        for n in range(8, 49, 4):
             num_model.append(str(n))
         self.num_combo = Gtk.DropDown(model=num_model)
-        self.num_combo.set_selected(1)     # 12 par défaut
+        self.num_combo.set_selected(1)
         grid.attach(self.num_combo, 1, 1, 1, 1)
 
         grid.attach(Gtk.Label(label="Format de la planche :"), 0, 2, 1, 1)
@@ -139,7 +137,6 @@ class PlancheContactGTK(Gtk.Application):
         # Watermark
         grid.attach(Gtk.Label(label="Filigrane (texte) :"), 0, 3, 1, 1)
         self.watermark_entry = Gtk.Entry()
-        self.watermark_entry.set_placeholder_text("© Ton Nom")
         grid.attach(self.watermark_entry, 1, 3, 1, 1)
 
         grid.attach(Gtk.Label(label="Orientation du filigrane :"), 0, 4, 1, 1)
@@ -314,14 +311,12 @@ class PlancheContactGTK(Gtk.Application):
                     GLib.idle_add(self._log, line)
                     GLib.idle_add(self.status_label.set_text, line)
 
-                    # 1. Priorité aux messages explicites PROGRESS:X/100
                     progress_match = re.search(r"PROGRESS:(\d+)/100", line)
                     if progress_match:
                         fraction = int(progress_match.group(1)) / 100.0
                         GLib.idle_add(self.progress.set_fraction, fraction)
                         continue
 
-                    # 2. Fallback pour les lignes "Planche X/Y"
                     match = re.search(r"Planche (\d+)/(\d+)", line)
                     if match:
                         current = int(match.group(1))
@@ -352,7 +347,6 @@ class PlancheContactGTK(Gtk.Application):
     # ====================== AIDE ======================
 
     def _open_full_manual(self, button):
-        """Ouvre le manuel complet dans le navigateur"""
         manual_path = Path(__file__).parent / "docs" / "planche-contact-manual.html"
 
         if manual_path.exists():
